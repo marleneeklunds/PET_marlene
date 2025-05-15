@@ -41,7 +41,7 @@ def get_sweatrate(Tsk, Tc, sex, body_area):
     """
     Find the sweat rate in kg/sm^2.
     """
-    tbody = 0.1 * Tsk + 0.9 * Tc  # body temperature, FRÅN FREDRIK
+    tbody = 0.1 * Tsk + 0.9 * Tc  # body temperature, FREDRIK
 
     if sex == 0:
         # sweat_rate = 8.47 * 10e-5 * ((0.1 * Tsk + 0.9 * Tc) - 36.6)  # for men, HÖPPE
@@ -66,15 +66,15 @@ def running_energy_balance_naked(vars, Ta, Tmrt, RH, v, met_rate, body_mass, hei
     SVP_Tex = get_saturation_vapor_pressure(T_ex)
     RTM = get_RTM(met_rate)
     h_c = 1.16*(10.45-v+10*v**(1/2)) # Heat transfer coeff dep on wind speed, Engineers toolbox, W/(K*m^2)
-    #h_c = 2.75 + 6.5 * v ** 0.67 # FREDRIK ANVÄNDER DENNA
-    h_e = 0.633 * h_c / (standard_pressure * air_spec_heatcapacity) # FREDRIK ANVÄNDER DENNA I E_Sw
+    #h_c = 2.75 + 6.5 * v ** 0.67 # FREDRIK 
+    h_e = 0.633 * h_c / (standard_pressure * air_spec_heatcapacity) # FREDRIK E_Sw
 
 
-    # FYSIOLOGISKA BERÄKNINGAR
+    # PHYSIOLOGICAL EQUATIONS
     blood_flow = get_bloodflow(Tc, Tsk)
     sweat_rate = get_sweatrate(Tsk, Tc, sex, A)
 
-    # VÄRMETRANSPORT - Simplified for naked body
+    # HEAT TRANSPORT - Simplified for naked body
     Fcs = blood_flow * blood_density * blood_spec_heatcapacity * (Tc - Tsk)  # core → skin
 
     E_res = RTM * air_spec_heatcapacity * (Ta - T_ex)
@@ -84,7 +84,7 @@ def running_energy_balance_naked(vars, Ta, Tmrt, RH, v, met_rate, body_mass, hei
     C = A * h_c * (Ta - Tsk) # Konvektion
     E_d = m * r * (SVP_Tsk - VP)
 
-    # Begränsad svettavdunstning
+    # LIMITATION OF SWEATING
     E_sw_phy = sweat_rate * r * A # Fredrik har negativ SW
     E_sw_pot = h_e * A *  r * (0.622 / standard_pressure) * (SVP_Tsk - VP) # Något med enheterna här???
     E_Sw = min(E_sw_phy, E_sw_pot)
@@ -95,12 +95,12 @@ def running_energy_balance_naked(vars, Ta, Tmrt, RH, v, met_rate, body_mass, hei
     H = M - W
     S = 0  # Steady state
 
-    # SYSTEMET: Vi vill att summan av alla flöden = 0 (balans)
+    # SYSTEM: We want the sum of all heat flows = 0, balance.
 
-    eq1 = Fcs - (R + C + E_d + E_Sw)  # Hudbalans: in (blod) = ut (rad + conv + evap)
-    eq2 = H - (Fcs + E_re)  # Kropp: in (metaboliskt) = ut (blod + respiration)
+    eq1 = Fcs - (R + C + E_d + E_Sw)  # Skin balance: in (blood) = out (rad + conv + evap)
+    eq2 = H - (Fcs + E_re)  # Body balance: in (metabolic) = out (blood + respiration)
 
-    # --- DEBUGGING PRINTS ---
+    # --- DEBUGGING ---
     print("\n--- Heat Flow Values (Debugging - Naked) ---")
     print(f"  Tsk: {Tsk:.2f} °C, Tc: {Tc:.2f} °C")
     print(f"  Fcs (Core->Skin): {Fcs:.2f} W")
@@ -121,7 +121,7 @@ def solve_Temps_naked(Ta, Tmrt, RH, v, met_rate, body_mass, height, sex):
 
     solution = root(running_energy_balance_naked, initial_guess,
                     args=(Ta, Tmrt, RH, v, met_rate, body_mass, height, sex),
-                    method='lm')
+                    method='lm') # Iterativ solver for Tsk and Tc
 
     if solution.success:
         Tsk, Tc = solution.x
@@ -170,7 +170,7 @@ def pet_energy_balance(Ta_ref, Tsk, Tc, body_mass, height, sex): # EJ KORRIGERAD
     eq1 = Fcs - (R + C + E_d + E_Sw)
     eq2 = H - (Fcs + E_re)
 
-    return eq1 + eq2  # Summerad obalans i hela kroppen
+    return eq1 + eq2  # Summed unbalance in the entire body
 
 def calculate_PET(Tsk, Tc, body_mass, height, sex):
     def func(Ta_ref):
@@ -186,7 +186,7 @@ def calculate_PET(Tsk, Tc, body_mass, height, sex):
         raise RuntimeError("PET-lösning konvergerade inte.")
 
 if __name__ == "__main__":
-    # Steg 1: Verkliga förhållanden (utan kläder)
+    # Steg 1: Real conditions while running, no clothes though.
     Ta = 25
     Tmrt = 40
     RH = 50
